@@ -10,16 +10,77 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Languages {
+  eng
+  ru
+}
+
+enum Themes {
+  light
+  dark
+}
+
+enum SubscriptionType {
+  None
+  Telegram
+  Whatsup
+  Viber
+  Email
+}
+
+model Company {
+  id             Int     @id @default(autoincrement())
+  name           String?
+  address        String?
+  additionalInfo String?
+
+  users   User[]
+  clients Client[]
+}
+
 model User {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  phone     String?  @unique
+  email     String   @unique
+  hash      String
+  hashedRt  String? // hash for refrech token
 
-  phone String? @unique
-  email String  @unique
+  firstName String?
+  lastName  String?
 
-  hash     String
-  hashedRt String? // hash for refrech token
+  company   Company? @relation(fields: [companyId], references: [id])
+  companyId Int?
+
+  client Client[]
+
+  settings Settings?
 
   @@map("users")
+}
+
+model Settings {
+  user     User      @relation(fields: [userId], references: [id])
+  userId   Int       @unique
+  language Languages @default(ru)
+  theme    Themes    @default(light)
+}
+
+model Client {
+  id                  Int      @id @default(autoincrement())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  phone               String?
+  companyName         String?
+  address             String?
+  subscriptionAddress String?
+
+  subscriptionType SubscriptionType @default(None)
+
+  company   Company? @relation(fields: [companyId], references: [id])
+  companyId Int?
+
+  user      User @relation(fields: [createdBy], references: [id])
+  createdBy Int  @unique
 }

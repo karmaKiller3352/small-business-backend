@@ -2,8 +2,8 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-
-import { PrismaService } from '../prisma/prisma.service';
+import { ExeptionHadler } from 'src/core/exeptions/ExeptionHandler';
+import { PrismaService } from 'src/core/prisma/prisma.service';
 import { Tokens } from './types';
 import { AuthDto } from './dto/auth.dto';
 
@@ -57,29 +57,39 @@ export class AuthService {
     })
   }
 
-    // method creates tokens and saves refresh token to db
-    private async createTokens(user): Promise<Tokens> {
-      const tokens = await this.generateTokens(
-        user.id,
-        user.email
-      )
-  
-      await this.updateRtHash(user.id, tokens.refresh_token)
-  
-      return tokens
-    }
+  // method creates tokens and saves refresh token to db
+  private async createTokens(user): Promise<Tokens> {
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email
+    )
+
+    await this.updateRtHash(user.id, tokens.refresh_token)
+
+    return tokens
+  }
 
   async signUp(dto: AuthDto): Promise<Tokens> {
     const hash = await this.hashData(dto.password)
 
-    const newUser = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        hash,
-      }
-    })
+    try {
+      const newUser = await this.prisma.user.create({
+        data: {
+          email: dto.email,
+          hash,
+          company: {
+            create: {
+              name: null
+            }
+          }
+        }
+      })
 
-    return await this.createTokens(newUser)
+      return await this.createTokens(newUser)
+    } catch (error) {
+      throw new ExeptionHadler(error)
+    }
+
   }
 
   async signIn(dto: AuthDto): Promise<Tokens> {
@@ -88,7 +98,7 @@ export class AuthService {
         email: dto.email
       }
     })
-  
+
     if (!user) throw new ForbiddenException('Access Denied') // TO DO: to think about exeptions
 
     const passwordMatches = await bcrypt.compare(dto.password, user.hash)
@@ -113,7 +123,7 @@ export class AuthService {
     const rtMatches = await bcrypt.compare(rt, user.hashedRt)
 
     if (!rtMatches) throw new ForbiddenException('Access Denied')
-  
+
     return await this.createTokens(user)
   }
 }
